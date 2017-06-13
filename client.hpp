@@ -17,8 +17,16 @@
 #include <fstream>
 #include <sstream>
 using namespace std;
+class client_type
+{
 
-
+public:
+    int socketFD;
+    int id;
+    char received_message[1024];
+    string clientName;
+};
+/*
 class Client
 {
     
@@ -32,12 +40,12 @@ public:
     int clientID;
     bool isActive;
     int startClient();
-    bool setActive();
+    //bool setActive();
     
     
 };
 
-
+*/
 
 
 

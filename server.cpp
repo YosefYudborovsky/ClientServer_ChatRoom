@@ -1,6 +1,5 @@
 //
 //  server.cpp
-//  Lab3
 //
 //  Created by Yosef Yudborovsky on 5/15/17.
 //  Copyright © 2017 Yosef Yudborovsky. All rights reserved.
@@ -11,8 +10,6 @@
 #define server_cpp
 
 #include "server.hpp"
-#include "client.hpp"
-//#include "client.cpp"
 #include <string>
 #include <iostream>
 #include <fstream>
@@ -26,87 +23,30 @@
 #include <unistd.h>
 #include <vector>
 #include <thread>
+#include <string.h>
 
 using namespace std;
 
 
-bool Server::verifyUser()
-{
-    bool permited = 0;
-    // check records for provided userID and password
-    
-    string userID, password;
-    
-    cout << "Hello, To Login Please provide Your UserID and Password \n";
-    cout << "UserID: \n";
-    cin >> userID;
-    cout << "Password: \n";
-    cin >> password;
+int newClient(Client &new_client, vector<Client> &client_array, thread &thread);
 
-    string line, nextLine = "";
-    ifstream file;
-    //ifstream file("loginDetails.txt", ios::in);
-    file.open ("loginDetails.txt");
-    //file.open();
-    while(file.good())
-    {
-        getline(file,line);
-        cout << "in file: " << line <<endl;
+const int MAXCLIENTS = 3; // set in advance
+const int bufsize = 1024; // to hold actual masseges
 
-        //lineList.push(line);
-    }
-    
-    
-    if (file.is_open())
-    {
-        
-        //while (!file.eof()) // not end of file
-        //{
-        
-        cout << "in file: " << nextLine <<endl;
-        
-        while (getline(file,nextLine)) // read line by line
-        {
-            stringstream iss(nextLine); // get the next line and convert to stingStream
-            cout << "line: " << nextLine <<endl;
-            
-            string first,second;
-            //iss >> read next word
-            
-            /*while(iss >> first)
-             {
-             
-             }
-             */
-        }
-        
-        //}// End while.
-        file.close();
+bool verifyUser(char tempmsg[bufsize], string &name); // to veirfy a user
 
-    }
-    else cout << "Error opening file \n";
- 
-    return permited;
-}
-
-//int Server::createChat()
-//{
 
 int main()
 {
-    int socketFD, newSocketFD; // to hold the returned value from system calls -> change to clienFD serverFD
-    int portNum = 13607; // 1 and last 4 ID digits
+    int socketFD, newSocketFD, newSocketFD1, newSocketFD2, newSocketFD3; // to hold the returned value from system calls -> change to clienFD serverFD
+    int portNum = 13607; // A random port
     bool exitChat = false; // to exit the listenig loop
-    int bufsize = 1024; // to hold actual masseges
     char buffer[bufsize]; // to hold actual masseges
-    int MAXCLIENTS = 3; // max for clients
-    string ipaddress = "127.0.0.1", chatLine; // ip and each line of chat
-    long numOfChar = 0; // num of characters in read and send massages
-    //vector <Client> client(MAXCLIENTS); // to hold each client
-    //thread newThread[MAXCLIENTS];
-    
-    
-    /// Change name server_addr/// client
+    bool chatIsOver = false;
+    long numOfLogin = 0; // num of characters in read and send massages
+    vector <Client> client(MAXCLIENTS); // to hold each client
+    thread newThread[MAXCLIENTS];
+    string msg = "";
     
     struct sockaddr_in server_addr; // A socket struct which is defined in netinet/in.h and contains the address of the server -> change anme
     socklen_t size;  //
@@ -116,8 +56,8 @@ int main()
     
     if (socketFD < 0) // the socket could not be constructed and client value is < 0
     {
-        cout << "Could not create the socket " << endl;
-        return 1;  //exit(1);
+        cout << "Could not create a socket for connection" << endl;
+        return 1;  
     }
 
     else cout << "Socket has been established" << endl;
@@ -134,114 +74,391 @@ int main()
      */
     if ((::bind(socketFD, (struct sockaddr*)&server_addr,sizeof(server_addr))) < 0)
     {
-        cout << "Error: the socket has already been established " << endl;
+        cout << "Error: the socket seem to be in use (try recompiling) " << endl;
         return 0;
-    }
-    //else cout << "bind is good" <<endl;
-    
+    }    
 
-    // listen for connectionsup for up to 3 clients
+    // listen for connections up to 3 clients
     listen(socketFD, MAXCLIENTS);
-    int clientCount = 1;
+    int num_clients = -1, temp_id;
+    cout << "listening..." <<endl;
 
     size = sizeof(server_addr);
  
-
-
-    // wake up the process when a connection from a client has been successfully established. It returns a new file descriptor.
-    // The other two arguments are reference pointer to the address of the client and the size of this structure.
-    newSocketFD = accept(socketFD,(struct sockaddr *)&server_addr,&size);
-    
-    // At this point, any new connection has to be verifyied with the credentails store in loginDetails.txt
-
-    // Each new connection receives eachown FD variable and handled seperatly.
-    // For communications b/w clients, we usesend and recive acording to send requirements
-
-    
-    if (newSocketFD < 0) // check if connection is valid
-        cout << "Error on accept: Connection faild to established " << endl;
-    //else cout << "accept is good. ServerFD value is:" << newSocketFD << endl;
-
-    bzero(buffer,bufsize); // set buffer to zero
-    strcpy(buffer, "Server connected and waiting: \n"); //make a string mesaage into the buffer to be sent first
-    send(newSocketFD, buffer, bufsize, 0); // send the first inviting mesage as a massage
-
-
-    while (newSocketFD > 0) //FD value is good
+    //Initialize each of the client in the client vector
+    for (int i = 0; i < MAXCLIENTS; i++)
     {
-        //cout << "Waiting "<< endl;
-        //strcpy(buffer, "Server connected and waiting: \n"); //make a string mesaage into the buffer to be sent first
-        
-        // send first message from server to client
-        //cout << "message 1 sent s->c "<< endl;
+        client[i].id = -1;
+        client[i].clientSocketFD = 0;
+        client[i].connected=false;
+    }
+ 
+    while (1) // keep looping to accept new connection
+    {
+ 
+        int incomingFD = 0; // to indicate reult of connection
+        incomingFD = accept(socketFD, NULL, NULL); // accept new connection
+ 
+        if (incomingFD == 0) continue; // if false, skip forward
+ 
+        //Reset the number of clients
+        num_clients = -1;
+ 
+        //Create a temporary id for the next client this will allow to identify each before recognizing as client
+        temp_id = -1;
+        for (int i = 0; i < MAXCLIENTS; i++) // loop through each
+        {
+            if (client[i].clientSocketFD == 0 && temp_id == -1) // good (new) connection
+            {
+                client[i].clientSocketFD = incomingFD; // assign the established connection to the new client
+                client[i].id = i;
+                temp_id = i;
+            }
+ 
+            if (client[i].clientSocketFD != 0)
+                num_clients++; // new client
+ 
+        }
+ 
 
-        //cout << clientCount << "is connected "<< endl; // clients in the room
-        //cout << clientCount << ": "<< endl; // clients turn
-        
-        //recive message
-        bzero(buffer,bufsize); // set buffer to zero
-        numOfChar = read(newSocketFD,buffer,bufsize); // get the number of byts received
-        if (numOfChar < 0)
+        if (temp_id != -1) 
         {
 
-            cout <<"Empty Connection"<< endl;
-            newSocketFD = 0;
+            //Send the id to that client
+            cout << "Client " << client[temp_id].id << ": Requiers Login" << endl;
+            msg = to_string(client[temp_id].id);
+            send(client[temp_id].clientSocketFD, msg.c_str(), strlen(msg.c_str()), 0);
+ 
+            //Create a thread process for that client
+            newThread[temp_id] = thread(newClient, ref(client[temp_id]), ref(client), ref(newThread[temp_id]));
+
         }
-        else
+        else  
         {
-            cout <<"\n" << clientCount << ": " << buffer << endl; // use consule to asses status
-
-            send(newSocketFD, buffer, bufsize, 0); // echo it back to the connection
-
+            msg = "Server is full"; // - No More Avaliable Connections";
+            send(incomingFD, msg.c_str(), strlen(msg.c_str()), 0);
+            cout << msg << endl;
         }
-
-          
-        //getline(cin, chatLine);
-        
-        
-    } // end of while
-    cout << "Chat is Over " << endl;
-    close(newSocketFD);
-    
-    cout << "\nGoodbye..." << endl;
-    exitChat = false;
-    
+    } //end while
+ 
+    //Close listening socket
     close(socketFD);
+ 
+    //Close client socket
+    for (int i = 0; i < MAXCLIENTS; i++)
+    {
+        newThread[i].join();
+    }
+    return 0;
 
+}
+ 
+// the process to handle each client 
+int newClient(Client &new_client, vector<Client> &client_array, thread &thread)
+{
+    string msg = "", clientName = "";
+    char tempmsg[bufsize] = "";
+    bool legit=false;
+    vector <string> connectedClients; // to hold the name of all connected
+    
+    // First: check if a legit client
+    msg = "Please provide Your UserID and Password (userID password)"; // ask for credentials
+    send(new_client.clientSocketFD, msg.c_str(), strlen(msg.c_str()), 0); // send the request
+    
+    // get login details
+    memset(tempmsg, 0, bufsize); // set all to zero to later hold the response
+    recv(new_client.clientSocketFD, tempmsg, bufsize, 0); // receive the response
+    legit = verifyUser(tempmsg, clientName); // send the buffer with the credentials to verify correctness
+    if (legit)
+    {
+        msg = "" + clientName + " Joined the Room";
+        connectedClients.push_back (clientName); // store the name of the new connection
+        new_client.nameOfClient = clientName;
+        
+        //Broadcast the new connection to the other clients
+        for (int i = 0; i < MAXCLIENTS; i++)
+        {
+            if (client_array[i].clientSocketFD != 0)
+                send(client_array[i].clientSocketFD, msg.c_str(), strlen(msg.c_str()), 0);
+        }
+    }
+  
+    while (1) // keep looping to be avaliable for all received messages
+    {
+        // if legitimate client provide all the required functions 
+        if (legit)
+        {
+
+            memset(tempmsg, 0, bufsize); // set message buffer to zero
+ 
+            if (new_client.clientSocketFD != 0) // 
+            {
+                int resultedFD = recv(new_client.clientSocketFD, tempmsg, bufsize, 0); // FD to evalute a new message
+                string temp; // for message manipulation
+                // Logout option
+                if (tempmsg[0]=='l' && tempmsg[1]=='o' && tempmsg[2]=='g' && tempmsg[3]=='o'&& tempmsg[4]=='u' && tempmsg[5]=='t')
+                {
+                    msg = "" + clientName + " Left the Room";
+                    
+                    // delete the name 
+                    for (int i = 0; i < connectedClients.size() ; i++)
+                    {
+                        if (connectedClients.at(i) ==  clientName) connectedClients.erase(connectedClients.begin()+i);
+                    }
+ 
+                    cout << msg << endl;
+ 
+                    close(new_client.clientSocketFD); //
+                    close(client_array[new_client.id].clientSocketFD);
+                    client_array[new_client.id].clientSocketFD = 0;
+ 
+                    //Broadcast the disconnection message to the other clients
+                    for (int i = 0; i < MAXCLIENTS; i++)
+                    {
+                        if (client_array[i].clientSocketFD != 0)
+                        resultedFD = send(client_array[i].clientSocketFD, msg.c_str(), strlen(msg.c_str()), 0);
+                    }
+ 
+                    break;
+                }
+
+                // Who option
+                if (tempmsg[0]=='w' && tempmsg[1]=='h' && tempmsg[2]=='o') // Who is connected
+                {
+                    cout << " At Who" << endl;
+                    //respond with all that connected by loopin through the names vector
+                    if (connectedClients.size()==1) msg = connectedClients.at(0); // if only one - avoid ','
+                    else 
+                    {
+                        for (int i = 0; i < connectedClients.size() ; i++)
+                        {
+                            msg += connectedClients.at(i) + ", ";
+                        }
+
+                    }
+                    cout << msg.c_str() << endl;
+                    for (int i = 0; i < MAXCLIENTS; i++)
+                    {   
+                        if (client_array[i].clientSocketFD != 0)
+                        resultedFD = send(client_array[i].clientSocketFD, msg.c_str(), strlen(msg.c_str()), 0);
+                    }
+                    
+                    continue;
+                }
+
+                // Send All Option 
+                if (resultedFD >0 && (tempmsg[0]=='s' && tempmsg[1]=='e' && tempmsg[2]=='n' && tempmsg[3]=='d' && tempmsg[4]==' ' && tempmsg[5]=='a' && tempmsg[6]=='l' && tempmsg[6]=='l'))
+                {
+                    if (strcmp("", tempmsg))
+                    {
+                        temp = tempmsg;
+                        msg = temp.substr(9,temp.size()); // manipulate the meassge to avoid 'send all'
+                        msg = "" + clientName + ": " + msg;
+                        
+                    }
+ 
+                    cout << msg.c_str() << endl;
+ 
+                    //Broadcast that message to the other clients
+                    for (int i = 0; i < MAXCLIENTS; i++)
+                    {
+                        if (client_array[i].clientSocketFD != 0)
+                            if (new_client.id != i)
+                                resultedFD = send(client_array[i].clientSocketFD, msg.c_str(), strlen(msg.c_str()), 0);
+                    }
+
+                }
+
+                 // Send individual Option 
+                if (resultedFD >0 && (tempmsg[0]=='s' && tempmsg[1]=='e' && tempmsg[2]=='n' && tempmsg[3]=='d')) // && tempmsg[4]==' ' && tempmsg[5]=='a' && tempmsg[6]=='l' && tempmsg[6]=='l'))
+                {
+                    if (tempmsg[5]=='T') // send to Tom
+                    {
+                        
+                        if (strcmp("", tempmsg))
+                        {   
+                            temp = tempmsg;
+                            msg = temp.substr(9,temp.size()); // manipulate the meassge to avoid 'send all'
+                            msg = "" + clientName + " (to Tom): " + msg;
+                            cout << msg  << endl;
+                        
+                        }
+                    
+                        //Unicast the message to the relevant client
+                        for (int i = 0; i < MAXCLIENTS; i++)
+                        {
+                            if (client_array[i].nameOfClient == "Tom")
+                                resultedFD = send(client_array[i].clientSocketFD, msg.c_str(), strlen(msg.c_str()), 0);
+                        }
+
+                    }
+
+                    else if (tempmsg[5]=='D') // send to David
+                    {
+                        if (strcmp("", tempmsg))
+                        {   
+                            temp = tempmsg;
+                            msg = temp.substr(11,temp.size()); // manipulate the meassge to avoid 'send all'
+                            msg = "" + clientName + " (to David): " + msg;
+                            cout << msg  << endl;
+                        
+                        }
+                        
+                        //Unicast the message to the relevant client
+                        for (int i = 0; i < MAXCLIENTS; i++)
+                        {
+                            if (client_array[i].nameOfClient == "David")
+                                resultedFD = send(client_array[i].clientSocketFD, msg.c_str(), strlen(msg.c_str()), 0);
+                        }
+
+                    }
+
+                    else if (tempmsg[5]=='B') // send to Beth
+                    {
+                        if (strcmp("", tempmsg))
+                        {   
+                            temp = tempmsg;
+                            msg = temp.substr(10,temp.size()); // manipulate the meassge to avoid 'send all'
+                            msg = "" + clientName + " (to Beth): " + msg;
+                            cout << msg  << endl;
+                        
+                        }
+ 
+                        //Unicast the message to the relevant client
+                        for (int i = 0; i < MAXCLIENTS; i++)
+                        {
+                            if (client_array[i].nameOfClient == "Beth")
+                                resultedFD = send(client_array[i].clientSocketFD, msg.c_str(), strlen(msg.c_str()), 0);
+                        }
+
+
+                    }
+
+                    else if (tempmsg[5]=='J') // send to John
+                    {
+                        if (strcmp("", tempmsg))
+                        {   
+                            temp = tempmsg;
+                            msg = temp.substr(10,temp.size()); // manipulate the meassge to avoid 'send all'
+                            msg = "" + clientName + " (to John): " + msg;
+                            cout << msg  << endl;
+                        
+                        }
+ 
+                        //Unicast the message to the relevant client
+                        for (int i = 0; i < MAXCLIENTS; i++)
+                        {
+                            if (client_array[i].nameOfClient == "John")
+                                resultedFD = send(client_array[i].clientSocketFD, msg.c_str(), strlen(msg.c_str()), 0);
+                        }
+
+                    }
+
+                }
+
+                if (resultedFD <=0) // end of connection
+                {
+                    
+                    msg = "" + clientName + " Left the Room";
+
+                    // delete the name 
+                    for (int i = 0; i < connectedClients.size() ; i++)
+                    {
+                        if (connectedClients.at(i) ==  clientName) connectedClients.erase(connectedClients.begin()+i);
+                    }
+                    cout << msg << endl;
+ 
+                    close(new_client.clientSocketFD); //
+                    close(client_array[new_client.id].clientSocketFD);
+                    client_array[new_client.id].clientSocketFD = 0;
+ 
+                    //Sent the disconnection message to all  other clients
+                    for (int i = 0; i < MAXCLIENTS; i++)
+                    {
+                        if (client_array[i].clientSocketFD != 0)
+                        resultedFD = send(client_array[i].clientSocketFD, msg.c_str(), strlen(msg.c_str()), 0);
+                    }
+ 
+                    break;
+                }
+            }
+
+        }
+        else // if not a legit user ask again and test again
+        {
+            msg = "Client " + to_string(new_client.id) + " Could Not Be verifyied";
+            send(new_client.clientSocketFD, msg.c_str(), strlen(msg.c_str()), 0);
+            cout << msg << endl;
+            msg = "Please provide Your UserID and Password (userID password)"; // ask for credentials
+            send(new_client.clientSocketFD, msg.c_str(), strlen(msg.c_str()), 0); // send the request
+            
+            memset(tempmsg, 0, bufsize); // set all to zero to later hold the response
+            recv(new_client.clientSocketFD, tempmsg, bufsize, 0); // receive the response
+            legit = verifyUser(tempmsg, clientName); // send the buffer with the credentials to verify correctness
+            
+            if (legit)
+            {
+                msg = "" + clientName + " Joined the Room";
+                connectedClients.push_back (clientName); // store the name of the new connection
+                new_client.nameOfClient = clientName; // add the name to the class
+
+
+                //Broadcast the new connection to the other clients
+                for (int i = 0; i < MAXCLIENTS; i++)
+                {
+                    if (client_array[i].clientSocketFD != 0)
+                    send(client_array[i].clientSocketFD, msg.c_str(), strlen(msg.c_str()), 0);
+                }
+            }
+            continue;
+
+        }
+
+    } //end while
+    close(new_client.clientSocketFD); //
+    close(client_array[new_client.id].clientSocketFD);
+    client_array[new_client.id].clientSocketFD = 0;
+ 
+    connectedClients.clear(); // empty the vector
     return 0;
 }
+
+
+
+bool verifyUser(char tempmsg[bufsize], string &clientName)
+{       
+    bool permited = false;
     
-//}
+    // check records for provided userID and password
+    string line, nextLine = "";
+    ifstream file;
+    file.open ("loginDetails.txt");
+    
+    while(file.good())
+    {        
+        while (getline(file,line))
+        {
+            if (strcmp(line.c_str(), tempmsg)==0)
+            {
+                cout << line << " Matched for Login" <<endl;
+                istringstream iss(line);
+                string word;
+                iss >> word;
+                clientName = word;
+                permited=true;
+                file.close();  
+                memset(tempmsg, 0, bufsize); // set all to zero to later hold the response
+                return permited;
 
+            }
+      
+        }
+        file.close();  
 
-
+    }
+    
+    return permited;
+ 
+}
 
 #endif /* server_cpp */
-
-
-
-
-
-
-
-/*void Server::startServer()
- {
- cout << "ChatRoom Server Is Running \n";
- 
- string userID, password;
- bool permition = 0;
- 
- cout << "To Login Please provide Your UserID and Password \n";
- cout << "UserID: \n";
- cin >> userID;
- cout << "Password: \n";
- cin >> password;
- 
- permition = mainServer.verifyUser(userID, password);
- if (permition == 0) cout <<"Permission is denied \n";
- else // Aproved User - crate sockets on server end end
- {
- 
- }
- }
- */

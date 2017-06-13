@@ -17,26 +17,18 @@
 #include <sstream>
 using namespace std;
 
-
-class Server
+class Client
 {
-    
-    //auto constructor
-    //auto destructor
+    public:
+        Client(){};
+        ~Client(){};
 
-    
-public:
-    bool verifyUser();
-    int createChat();
-    
-    void startServer(Server &mainServer);
-    
-    
+    int id;
+    int clientSocketFD;
+    bool connected;
+    string nameOfClient;
+
+
 };
-
-
-
-
-
 
 #endif /* server_hpp */
