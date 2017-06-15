@@ -6,7 +6,7 @@ The chat room follow the following protocol:
 2. Upon successful verification a client can choose between three functions:
 	a. message all -> requires appending the massage with 'send all' (e.g. send all Hello people)
 	b. message individual user -> requires appending the message with 'send UserName' (e.g. send Beth Hi Beth)
-    Note: Current individual messaging users the provided naming in the credentials file (.txt)
+    		Note: Current individual messaging users the provided naming in the credentials file (.txt)
 	c. see how is currently in the chat room -> send the command 'who'
 	d. logout of the room -> send the command logout
 
@@ -20,8 +20,8 @@ To run the program, follow these steps:
   Note: Given that these processes run independently exist no issue with similar naming for all .out files
 7. All clients are logged-in -> Follow available chat functions
 
-# All communications implemented using a socket per each client (and for the server). Handling each client is done via threads to allow parallel execution of all communications
-# Current port address is 13607. Client IP is a loop back IP (127.0.0.1).
+- All communications implemented using a socket per each client (and for the server). Handling each client is done via threads to allow parallel execution of all communications
+- Current port address is 13607. Client IP is a loop back IP (127.0.0.1).
 
 Yosef Yudborovsky
 
