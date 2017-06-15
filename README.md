@@ -4,12 +4,17 @@ A chat-room program which simulates communications between multiple clients (3 i
 The chat room follow the following protocol:
 1. Access is limited to registered users by verifying userName and password against a given .txt file
 2. Upon successful verification a client can choose between three functions:
-	a. message all -> requires appending the massage with 'send all' (e.g. send all Hello people)
-	b. message individual user -> requires appending the message with 'send UserName' (e.g. send Beth Hi Beth)
-		Note: Current individual messaging users the provided naming in the credentials file (.txt)
-	c. see how is currently in the chat room -> send the command 'who'
-	d. logout of the room -> send the command logout
 
+	a. message all -> requires appending the massage with 'send all' (e.g. send all Hello people)
+	
+	b. message individual user -> requires appending the message with 'send UserName' (e.g. send Beth Hi Beth)
+	
+		Note: Current individual messaging users the provided naming in the credentials file (.txt)
+		
+	c. see how is currently in the chat room -> send the command 'who'
+	
+	d. logout of the room -> send the command logout
+	
 To run the program, follow these steps:
 1. Download all files and modify credentials (.txt) to your liking (each should exist on an individual line)
 2. Open four (4) terminal/CMD windows
